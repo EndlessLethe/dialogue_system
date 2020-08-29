@@ -2,8 +2,8 @@
 A gallary of multi turn dialogue model
 
 # Input
-For each sample:
-Input - list_history and query represented by ids
+For each sample:  
+Input - list_history and query represented by ids  
 Output - 2 class softmax result
 
 One sample one line, and k utterances is split by "\t"

@@ -289,13 +289,17 @@ def get_SMN_dataloader(filename, dict_word2id):
                 cnt += 1
             x_train[i][j][cnt] = dict_word2id["[EOS]"]
 
-    dataset_train = torch.utils.data.TensorDataset(torch.from_numpy(x_train).long(), torch.from_numpy(y_train).long())
-    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=batch_size, shuffle=True)
-    return dataloader_train
+    dataset = torch.utils.data.TensorDataset(torch.from_numpy(x_train).long(), torch.from_numpy(y_train).long())
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    return dataloader
 
 def run_SMN(use_gpu = True):
     embedding_loader = JDEmbeddingLoader()
     data_embedding, dict_word2id = embedding_loader.get_embedding()
+
+    dataloader_train = get_SMN_dataloader("./data/train.tsv", dict_word2id)
+    dataloader_dev = get_SMN_dataloader("./data/dev.tsv", dict_word2id)
+    dataloader_predict = get_SMN_dataloader("./data/test.tsv", dict_word2id)
 
     logging.info("creating model and loading data...")
     model = SMNModel(torch.from_numpy(np.array(data_embedding)), use_gpu)
@@ -306,10 +310,6 @@ def run_SMN(use_gpu = True):
     if use_gpu:
         model = model.cuda()
         loss_fn = loss_fn.cuda()
-
-    dataloader_train = get_SMN_dataloader("./data/train.tsv", dict_word2id)
-    dataloader_dev = get_SMN_dataloader("./data/dev.tsv", dict_word2id)
-    dataloader_predict = get_SMN_dataloader("./data/test.tsv", dict_word2id)
 
     patience_max = 5
     best_loss = 10000

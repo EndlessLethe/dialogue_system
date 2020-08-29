@@ -2,12 +2,13 @@
 Author: Zeng Siwei
 Date: 2020-08-27 17:05:13
 LastEditors: Zeng Siwei
-LastEditTime: 2020-08-29 00:37:14
+LastEditTime: 2020-08-29 09:28:34
 Description: 
 '''
 
 import torch
 import math, copy, time
+import logging
 
 def clones(module, N):
     "Produce N identical layers."
@@ -33,12 +34,21 @@ class DotAttentionLayer(torch.nn.Module):
             mask: shape (batch_size, 1, k)
         Returns: 
         '''
+        logging.debug("DotAttentionLayer query shape: " + str(query.shape))
+        logging.debug("DotAttentionLayer key shape: " + str(key.shape))
+
         query = self.W_q_layer(query)
         key = self.W_k_layer(key)
         scores = torch.matmul(query, key.transpose(-2, -1))
+
+        logging.debug("DotAttentionLayer scores shape: " + str(scores.shape))
+
         if mask is not None:
             scores = scores.masked_fill(mask == 0, -1e9)
         p_attn = torch.nn.functional.softmax(scores, dim = -1)
+
+        logging.debug("DotAttentionLayer attention_vec shape: " + str(p_attn.shape))
+
         if self.dropout is not None:
             p_attn = self.dropout(p_attn)
         return torch.matmul(p_attn, value), p_attn

@@ -110,6 +110,12 @@ class JDEmbeddingLoader():
         self.data_skipgram_embedding = data_skipgram
 
 if __name__ == '__main__':
+    '''
+    Usage:
+        embedding_loader = JDEmbeddingLoader()
+        data_embedding, dict_word2id = embedding_loader.get_embedding()
+    '''
+    
     logging.getLogger().setLevel(logging.DEBUG)
 
     embedding_loader = JDEmbeddingLoader()

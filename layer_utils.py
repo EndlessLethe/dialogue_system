@@ -2,7 +2,7 @@
 Author: Zeng Siwei
 Date: 2020-08-27 17:05:13
 LastEditors: Zeng Siwei
-LastEditTime: 2020-08-29 09:28:34
+LastEditTime: 2020-08-29 20:45:08
 Description: 
 '''
 
@@ -97,40 +97,5 @@ class MultiHeadedAttention(torch.nn.Module):
         return self.linears[-1](x)
 
 
-
-class BilinearSeqAttn(torch.nn.Module):
-    """
-    A bilinear attention layer over a sequence X w.r.t y:
-    * o_i = x_i'Wy for x_i in X.
-    """
-    def __init__(self, x_size, y_size, opt):
-        super(BilinearSeqAttn, self).__init__()
-        self.linear = torch.nn.Linear(y_size, x_size)
-
-    def forward(self, x, y, x_mask):
-        """
-        x = [batch, len, h1]
-        y = [batch, h2]
-        x_mask = [batch, len]
-        """
-
-        Wy = self.linear(y)
-        xWy = x.bmm(Wy.unsqueeze(2)).squeeze(2)
-        xWy.data.masked_fill_(x_mask.data, -float('inf'))
-        return xWy # [batch,len]
-
-# bmm: batch matrix multiplication
-# unsqueeze: add singleton dimension
-# squeeze: remove singleton dimension
-def weighted_avg(x, weights): 
-    """ x = [batch, len, d]
-        weights = [batch, len]
-    """
-    return weights.unsqueeze(1).bmm(x).squeeze(1)
-
 if __name__ == "__main__":
-    # [batch,sentence_len,hidden_dim], [batch,hidden_dim2] -> [batch,sentence_len]
-    sentence_weights = bilinear_seq_attn(sentence_hiddens, y, sentence_mask) 
-
-    # [batch,hidden_dim]
-    sentence_avg_hidden = weighted_avg(sentence_hiddens, sentence_weights)
+    pass

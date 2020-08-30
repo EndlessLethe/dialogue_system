@@ -2,7 +2,7 @@
 Author: Zeng Siwei
 Date: 2020-08-27 17:05:13
 LastEditors: Zeng Siwei
-LastEditTime: 2020-08-29 09:33:53
+LastEditTime: 2020-08-30 00:29:38
 Description: 
 '''
 
@@ -16,61 +16,8 @@ from function_utils import *
 from layer_utils import *
 
 # 使用词向量和attention后的字向量concat作为这个词的表示
-# 对于两个句子求平均（？or跳过）
-# 再将两个句子做一个self attention
-# 将结果再过一个线性层做预测
 
-n_word = None
-max_len_utterance = 50
-batch_size = 256
-dim_embedding = 300
-max_char_per_word = 5
-
-
-def build_word_dict(filename, cols=[]):
-    '''
-    Args: 
-	
-    Returns: 
-	
-    '''
-    word_dict = dict()
-    char_dict = dict()
-
-    # 后续添加列参数，只取文件某一列的数据
-    data = pd.read_csv(filename, header=None, sep="\t")
-    logging.info(filename + "\n" + str(data.iloc[0:10]))
-
-    PRE_TAGS = ["[PAD]", "[OOV]", "[BOS]", "[EOS]"]
-    cnt = 0
-    cnt_char = 0
-    for tag in PRE_TAGS:
-        word_dict[tag] = cnt
-        cnt += 1
-        char_dict[tag] = cnt_char
-        cnt_char += 1
-
-    for i in range(data.shape[0]):
-        for j in range(data.shape[1]):
-            if not cols or j in cols:
-                sentence = data.iat[i, j]
-                sentence_cuted = list(jieba.cut(str(sentence)))
-                for word in sentence_cuted:
-                    if word not in word_dict:
-                        word_dict[word] = cnt
-                        cnt += 1
-                    for ch in word:
-                        if u'\u4e00' <= ch <= u'\u9fff':
-                            if ch not in word_dict:
-                                word_dict[ch] = cnt
-                                cnt += 1
-                            if ch not in char_dict:
-                                char_dict[ch] = cnt_char
-                                cnt_char += 1
-    return word_dict, char_dict
-
-
-def process_sentence(sentence, dict_word2id, dict_char2id = dict(), use_char = False):
+def process_sentence(sentence, dict_word2id, dict_char2id = dict(), max_len_utterance = 50, max_char_per_word = 5, use_char = False):
     x_data = np.zeros(max_len_utterance)
     if use_char:
         x_data_char = np.zeros((max_len_utterance, max_char_per_word))
@@ -100,9 +47,12 @@ def process_sentence(sentence, dict_word2id, dict_char2id = dict(), use_char = F
         x_data[cnt] = dict_word2id["[PAD]"]
         cnt += 1
     x_data[cnt] = dict_word2id["[EOS]"]
-    return x_data, x_data_char
+    if use_char:
+        return x_data, x_data_char
+    else :
+        return x_data
 
-def get_dataloader(filename, dict_word2id, dict_char2id, cols = []):
+def get_char_word_dataloader(filename, dict_word2id, dict_char2id, max_len_utterance, max_char_per_word, batch_size = 256, cols = []):
     """
     File should have the format as: sentence1 \t sentence2 ... \t ... sentencek \n
     """
@@ -121,7 +71,7 @@ def get_dataloader(filename, dict_word2id, dict_char2id, cols = []):
             if cols and j not in cols:
                 continue
             sentence = data.iat[i, j]
-            x_data[i][cnt], x_data_char[i][cnt] = process_sentence(sentence, word_dict, char_dict, use_char = True)
+            x_data[i][cnt], x_data_char[i][cnt] = process_sentence(sentence, dict_word2id, dict_char2id, use_char = True)
             cnt += 1
 
     class CharAndWordSeqDataset(torch.utils.data.Dataset):
@@ -146,12 +96,12 @@ class CharAndWordEmbedding(torch.nn.Module):
     """
     This is used as an embedding layer.
     """
-    def __init__(self, n_dict_char, n_dict_word, char_pretrained_embedding = None, word_pretrained_embedding = None):
+    def __init__(self, n_dict_char, n_dict_word, embedding_dim, char_pretrained_embedding = None, word_pretrained_embedding = None):
         super(CharAndWordEmbedding, self).__init__()
         
-        self.char_embedding = torch.nn.Embedding(num_embeddings=n_dict_char, embedding_dim=dim_embedding, padding_idx=0)
-        self.word_embedding = torch.nn.Embedding(num_embeddings=n_dict_word, embedding_dim=dim_embedding, padding_idx=0)
-        self.attention_layer = DotAttentionLayer(dim_embedding, dim_embedding, dim_embedding)
+        self.char_embedding = torch.nn.Embedding(num_embeddings=n_dict_char, embedding_dim=embedding_dim, padding_idx=0)
+        self.word_embedding = torch.nn.Embedding(num_embeddings=n_dict_word, embedding_dim=embedding_dim, padding_idx=0)
+        self.attention_layer = DotAttentionLayer(embedding_dim, embedding_dim, embedding_dim)
 
         ### init layers
         if char_pretrained_embedding is not None:
@@ -183,24 +133,26 @@ class CharAndWordEmbedding(torch.nn.Module):
         char_mask = padding_mask(list_char_seq, 0)
         logging.debug("CharAndWordEmbedding char_mask shape: " + str(char_mask.shape))
 
-        ## (batch_size, max_sentence_len, 1, dim_embedding)
+        ## (batch_size, max_sentence_len, 1, embedding_dim)
         vec_word = self.word_embedding(word_seq)
         vec_word = vec_word.unsqueeze(-2)
         logging.debug("CharAndWordEmbedding vec_word shape: " + str(vec_word.shape))
  
-        ## (batch_size, max_sentence_len, max_char_len, dim_embedding)
+        ## (batch_size, max_sentence_len, max_char_len, embedding_dim)
         vec_list_char = self.char_embedding(list_char_seq)
         logging.debug("CharAndWordEmbedding vec_list_char shape: " + str(vec_list_char.shape))
         
 
         # vec_char = torch.sum(vec_list_char, dim=0) 
         vec_char, _ = self.attention_layer(vec_word, vec_list_char, vec_list_char, char_mask)
-        vec_cat = torch.cat((vec_word, vec_char))
+        vec_cat = torch.cat((vec_word, vec_char), dim=-1)
+        vec_cat = vec_cat.squeeze(-2)
         logging.debug("CharAndWordEmbedding vec_cat shape: " + str(vec_cat.shape))
         return vec_cat
         
 
-def test_data(word_dict, char_dict):
+def test_data():
+    word_dict, char_dict = build_word_dict("./data/simtrain_to05sts.txt", [1, 3])
     x_data, x_data_char = process_sentence("你的名字是什么鸭", word_dict, char_dict, use_char = True)
     print(x_data)
     print(x_data_char)
@@ -208,8 +160,9 @@ def test_data(word_dict, char_dict):
     char_mask = padding_mask(tensor, 0)
     print(char_mask.shape)
 
-def test_embedding(word_dict, char_dict, use_gpu = False):
-    dataloader = get_dataloader("./data/simtrain_to05sts.txt", word_dict, char_dict, cols = [1, 3])
+def test_embedding(use_gpu = False):
+    word_dict, char_dict = build_word_dict("./data/simtrain_to05sts.txt", [1, 3])
+    dataloader = get_char_word_dataloader("./data/simtrain_to05sts.txt", word_dict, char_dict, 50, 5, cols = [1, 3])
 
     for i, data in enumerate(dataloader):
         inputs, labels = data
@@ -219,7 +172,7 @@ def test_embedding(word_dict, char_dict, use_gpu = False):
             print(inputs[i].dtype)
             print(inputs[i].shape)
 
-        char_word_embedding_layer = CharAndWordEmbedding(len(word_dict), len(char_dict))
+        char_word_embedding_layer = CharAndWordEmbedding(len(word_dict), len(char_dict), 300)
 
         if use_gpu:
             inputs = [x.cuda() for x in inputs]
@@ -244,7 +197,6 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(logging.DEBUG)
     logging.getLogger("jieba").setLevel(logging.INFO)
     
-    word_dict, char_dict = build_word_dict("./data/simtrain_to05sts.txt", [1, 3])
-    # test_data(word_dict, char_dict)
-    test_model(word_dict, char_dict)
+    # test_data()
+    test_embedding()
     

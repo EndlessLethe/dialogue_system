@@ -5,7 +5,7 @@ This repo contains two parts:
 2. Multi turn dialogue models.
 
 ## Survey
-"多轮对话综述：过去、现在与应用"成稿于2019-12-21，是我为国科大自然语言处理课程而完成的课堂论文。
+"多轮对话综述：过去、现在与应用"成稿于2019-12-21，是我(曾四为 Zeng Siwei)为国科大自然语言处理课程而完成的课堂论文。
 
 Survey目录下包括一个PPT，是这篇论文作为优秀课堂论文在课上分享时所用。
 

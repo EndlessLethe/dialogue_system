@@ -4,6 +4,19 @@ JDAI-WORD-EMBEDDING/
 output/
 data/
 
+# latex
+*.synctex(busy)
+*.aux
+*.bbl
+*.blg
+*.log
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.out
+*.xdv
+*.qry
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
